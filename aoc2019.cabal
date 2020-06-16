@@ -30,6 +30,7 @@ library
       DayOne
       DayTwo
       DayThree
+      DayFour
       IntCode
   other-modules:
       Paths_aoc2019

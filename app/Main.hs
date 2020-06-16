@@ -1,8 +1,9 @@
 module Main where
 
-import qualified DayOne as One
-import qualified DayTwo as Two
-
+import DayOne
+import DayTwo
+import DayThree
+import DayFour
 
 main :: IO ()
-main = Two.main
+main = answersD4

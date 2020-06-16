@@ -1,4 +1,4 @@
-module IntCode (Program, IMachine, createIM, runMachine, runStep, injectValues, getMemValue, (!>)) where
+module IntCode (Program, IMachine, createIM, runMachine, injectValues, getMemValue, (!>)) where
 
 import           Control.Monad.State
 import           Data.IntMap.Strict  as M

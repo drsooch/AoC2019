@@ -1,4 +1,4 @@
-module DayTwo where
+module DayTwo (answersD2) where
 
 import           Control.Monad.State
 import qualified Data.Text           as T
@@ -6,8 +6,8 @@ import           Data.Text.IO        as TIO
 import           IntCode
 
 
-main :: IO ()
-main = do
+answersD2 :: IO ()
+answersD2 = do
   contents <- TIO.readFile "input/dayTwo.txt"
   let values = map (read . T.unpack) $ T.splitOn (T.pack ",") contents :: [Int]
   let initIM = createIM values
