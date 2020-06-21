@@ -3,7 +3,7 @@ module DayTwo (answersD2) where
 import           Control.Monad.State
 import qualified Data.Text           as T
 import           Data.Text.IO        as TIO
-import           IntCode
+import           IntCodeS
 
 
 answersD2 :: IO ()

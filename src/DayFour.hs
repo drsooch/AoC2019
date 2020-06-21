@@ -10,8 +10,10 @@ module DayFour (answersD4) where
 RANGE: 240298 - 784956
 -}
 
-import qualified Data.Text    as T
-import qualified Data.Text.IO as TIO
+answersD4 :: IO ()
+answersD4 = do
+  print $ "Part One: " ++ (show (part1 range))
+  print $ "Part Two: " ++ (show (part2 range))
 
 minVal :: Int
 minVal = 240298
@@ -69,7 +71,3 @@ part1 = length . filter (\n -> repeating n && inRange n)
 part2 :: [(Int, Int, Int, Int, Int, Int)] -> Int
 part2 = length . filter (\n -> doubles n && inRange n)
 
-answersD4 :: IO ()
-answersD4 = do
-  print $ "Part One: " ++ (show (part1 range))
-  print $ "Part Two: " ++ (show (part2 range))

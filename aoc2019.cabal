@@ -31,7 +31,9 @@ library
       DayTwo
       DayThree
       DayFour
+      DayFive
       IntCode
+      IntCodeS
   other-modules:
       Paths_aoc2019
   hs-source-dirs:
