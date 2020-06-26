@@ -478,8 +478,7 @@ Then each machine would produce one output value that was applied to the next ma
 Machine A was the special case where it was given a second input value of 0.
 
 Example:
-Machine A -> Machine B -> Machine C -> Machine D -> Machine E -> output value
- [1, 0]       [2, A]       [0, B]       [3, C]       [4, D]
+0 -> Machine A -> Machine B -> Machine C -> Machine D -> Machine E -> output value
 
 The most important piece of this was to not share memory between the machines, and that each machine starts with the same memory layout.
 I honestly thank immutability, as I could easily pass around the original state with no worries.
