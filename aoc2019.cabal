@@ -32,6 +32,8 @@ library
       DayThree
       DayFour
       DayFive
+      DaySix
+      DaySeven
       IntCode
       IntCodeS
   other-modules:

@@ -5,6 +5,8 @@ import DayTwo
 import DayThree
 import DayFour
 import DayFive
+import DaySix
+import DaySeven
 
 main :: IO ()
-main = answersD5
+main = answersD7

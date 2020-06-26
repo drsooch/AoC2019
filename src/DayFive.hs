@@ -12,15 +12,11 @@ answersD5 = do
   print $ "Part Two: " ++ (show $ part2 values)
 
 
--- 10987514 -> answer (all zeroes in the writer)
-part1 :: [Int] -> [Int]
-part1 mem = ans
-  where
-    (_, _, ans) = runRWS runMachine [1] (createIM mem)
+-- 10987514 -> answer
+part1 :: [Int] -> Int
+part1 mem = getMachineOutput mem [1]
 
 -- 14195011 -> answer
-part2 :: [Int] -> [Int]
-part2 mem = ans
-  where
-    (_, _, ans) = runRWS runMachine [5] (createIM mem)
+part2 :: [Int] -> Int
+part2 mem = getMachineOutput mem [5]
 

@@ -1,6 +1,5 @@
 module DayThree (answersD3) where
 
-import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
 import           Data.Text.IO    as TIO
