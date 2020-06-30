@@ -22,7 +22,10 @@ description:         Please see the README on GitHub at <https://github.com/drso
 dependencies:
 - base >= 4.7 && < 5
 - mtl
+- transformers
 - containers
+- split
+- text
 
 library:
   source-dirs: src

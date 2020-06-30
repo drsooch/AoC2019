@@ -602,3 +602,265 @@ part2 mem = maximum $ map (runFeedbackLoop mem) perms
   where
     perms = permutations [5 .. 9]
 ```
+
+***
+### Day Eight: Space Image Format
+
+***
+
+This was a fun one. I actually felt like a functional programmer doing this challenge.
+Day Eight required decoding an image format and reading the message it produces.
+The input comes in as a stream of digits from 0 to 2.
+0 indicates a black pixel, 1 indicates a white pixel, and 2 indicates a transparent pixel.
+The image consists of layers of pixels placed on top of each other. 
+
+For example a 2x2 picture with 3 layers would look like this:
+
+```
+Layer 1: 22
+         11
+
+Layer 2: 12
+         00
+
+Layer 3: 10
+         01
+```
+
+Each digit in each layer corresponds to a specific pixel, i.e. the first digit is the top-left pixel.
+This becomes more important in the second part.
+
+##### Part One:
+
+Part One was simply to make sure the image was received properly by checking its checksum (in this case a checkproduct...haha...).
+The task at hand was to find the layer with the LEAST number of 0's (least is capitalized as I thought it said MOST number of 0's).
+Then to multiply the number of 1's by the number of 2's.
+
+Simple enough.
+
+It was easy enough to break the input into the proper structure using ```chunksOf``` from the ```Data.List.Split``` library.
+I rolled my own function to count the number of zeroes in a layer, which boils down to ```length . filter (== 0)```.
+The final solution was a chain of function composition to transform the layer with the smallest number of 0s into the checksum.
+
+```Haskell
+part1 :: [Int] -> Int
+part1 = product        -- get the product of the two lengths
+  . (map length)       -- get the length of each list
+  . group              -- group the 1s into a list and 2s into a list
+  . sort               -- Sort the list into 1s and 2s
+  . filter (/= 0)      -- Remove the zeroes from the layer
+  . foldl1 countZeroes -- Find the minimum layer
+  . layers'            -- Transform the input into layers
+```
+
+I still don't understand fusion, but I think GHC can optimize out some of this stuff.
+
+##### Part Two:
+
+Part Two was transforming the layers into a picture.
+Now the picture I wrote up in the prelude will be of more use.
+The basic gist of the layering is that the final picture will use the top most visible pixel.
+
+Using the above example:
+
+Layer 1 has two transparent digits in its top row, so we drill down into the next layer to see if those pixels are visible.
+Layer 2 has a 1 in the top-left and another 2 in the top-right.
+This means the final image will have a 1 in the top-left, and we must drill-down one more level for the top right.
+The final layer has a 0 in the top-right position so the final image will have a 10 for the top row.
+The bottom row is trivial as they are both 1s which means the final picture will be:
+
+```
+10
+11
+```
+
+The solution I came up with is to transpose the list (which is essentially a matrix), placing each pixel in the same position into one list.
+Since the layers are ordered, we can traverse each list and find the first non-2 in the list and that will be our final pixel output.
+
+```Haskell
+part2 :: [Int] -> [[T.Text]]
+part2 =
+  chunksOf width           -- This is done to make output readable
+  . map transform          -- apply transformation to make text readable
+  . concatMap (take 1)     -- take the first digit and flatten the list
+  . map (dropWhile (== 2)) -- drop leading 2's
+  . transpose              -- transpose matrix
+  . layers'                -- Transform the input into layers
+  where
+    transform x = if x == 1 then "X" else " "  -- trivial function to make output more readable
+```
+
+I chunked the final output so I could "pretty print" the output, which is ASCII art. 
+
+
+***
+### Day Nine: Sensor Boost
+
+***
+
+New day, new IntCode Operation.
+Day Nine added a new instruction and piece to the IMachine.
+The IMachine must now keep track of a "relative base index".
+The relative base index starts at 0 when an IMachine is created.
+The new instruction (op code 9) increments the relative base index by the value located in its only parameter.
+Speaking of parameters, the relative base is used for the third parameter mode, Relative.
+What this means is that when a parameter is in Mode 2 or Relative, the value in the address is added to the current relative base index, and this value is then used as the address for whatever operation is to be executed.
+For example, given a relative base of 50 and a parameter in mode Relative of -7, the new address would 50 + -7 or 43.
+Implementing this change took very little time, as it was simple to add to the existing code base.
+
+There were two other requirements needed for Day Nine, support for large numbers and memory access past the bounds of the program.
+The support for large numbers is simply, just a find and replace Int with Integer.
+An Integer in Haskell has no bounds and can grow indefinitely.
+The second change didn't seem to affect the program. 
+The map look-ups will fail when trying to access a value that is not a member.
+However, I never got a failure when running the program, so I just omitted it for the time being.
+It should also be noted that there was no actual need for Integer support, when I originally ran the problem I got the correct output but omitted one digit so I received a failure.
+This is when I made the change to the underlying representation of the machine.
+
+I won't bother doing a breakdown as both parts were simply running the machine given two inputs.
+
+***
+### Day Ten: Monitoring Station
+
+***
+
+Not much background needed, let's jump right into it.
+
+##### Part One:
+
+Day Ten Part One involved finding the best asteroid to build a monitoring station.
+We are given a map of the area which has a coordinate system of asteroids and empty space.
+The best asteroid to build the station is the point in the area that has the most number of VISIBLE asteroids from its location.
+The prompt indicates that each asteroid is located at the center of its coordinate, this means that asteroids "hide" other asteroids if they fall on the same line.
+
+For example this is a 4x4 map, where each ```#``` is an asteroid.
+
+```
+..#.
+###.
+#..#
+.#.#
+```
+
+The problem at hand is to search all asteroids in the area, and counting the number of visible asteroids, attempting to find the largest number of visible asteroids.
+Thanks to trigonometric functions (well inverse trig functions), we can determine the angle from the asteroid being tested to all other asteroids in the system.
+We can then build a set of all angles, which will remove any duplicates (aka asteroids that are on the same line).
+
+This begs the question how can we reasonable translate the input into a coordinate map.
+Well, the little function ```divMod``` can do the heavy lifting for us.
+This function combines integer division and mod division into one operation.
+Given an array (list) and a width of each row, we can use this function to create a coordinate in one go.
+When flattening a 2D array into a 1D array its common to use the function (x * width) + y.
+The ```divMod``` function reverses this operation into (y, x).
+A simple ```swap``` reverses the tuple and creates a coordinate.
+
+The final parsing implementation is as follows:
+
+```Haskell
+parseToCoordList :: [String] -> [Coord]
+parseToCoordList xs =
+  map (toD . itc)      -- Map int to coords onto each asteroid index and transform to Double
+  $ elemIndices '#'    -- Find each asteroid's index
+  $ concat xs          -- Concat the input so we can remove new lines
+  where
+    width = length (xs !! 0)
+    itc n = swap $ divMod n width  -- The coordinate system is flipped
+    toD (x, y) = (fromIntegral x, fromIntegral y)
+```
+
+Perfect, but now we need to test each coordinate and find out how many visible asteroids there are.
+People always complain about learning trigonometry functions in high school, but they will be extremely useful here.
+
+```Haskell
+-- computes the angle from one coordinate to another
+-- Bounds are [-pi, pi], for part 2 we adjust this range from [0, 2pi]
+angle :: Coord -> Coord -> Double
+angle (x1, y1) (x2, y2) = pi + atan2 (y1 - y2) (x1 - x2)
+```
+
+The first coordinate is always curried to be the coordinate we are searching from.
+
+We use this function when we fold over the input and create a Map from Coordinate to a Set of Doubles.
+
+```Haskell
+part1 :: [Coord] -> (Coord, Int)
+part1 cm =
+  foldl1 maximum'                    -- get the coordinate with the largest set
+  $ map size                         -- Map the size function to the tuple of (coord, set)
+  $ M.toList                         -- Turn the map into a list
+  $ foldl (flip insertP) M.empty cm  -- fold over the list of coords, creating a map of a coordinate to a set of angles
+  where
+    cmA p1 = S.fromList $ map (angle p1) cm   -- create a set of angles from the point supplied
+    insertP p = M.insert p (cmA p)            -- insert a coordinate and its angles into the map
+    size (p, s) = (p, S.size s)               -- map set size from list
+    maximum' acc@(_, s1) curr@(_, s2) = if s1 > s2 then acc else curr  -- maximum function on two tuples
+```
+
+The comments succinctly describe what is happening.
+The actual solution is done by the ```maximum'``` function which searches the map for the largest Set.
+
+##### Part Two:
+
+Part One took relatively little time. Part Two on the other hand had me drawing out coordinate systems on a piece of paper for hours.
+
+After finding the best asteroid to build the monitoring station, we were tasked with destroying all the asteroids around the station.
+The prompt is also looking for the 200th asteroid that gets destroyed.
+We start by pointing our laser UP.
+When I first read this I was under the impression that it was in reference to the coordinate system.
+However, the coordinate system origin starts from the top-left, so that UP is actually DOWN. 
+After destroying one asteroid the laser moves in a clockwise rotation.
+However, if the asteroid destroyed reveals an asteroid behind it, we must wait until we make it all the way around again.
+To help keep track of all the moving pieces, I created the ```Laser``` data type.
+
+```Haskell
+data Laser = L { numDest :: Int      -- Number of asteroids destroyed
+               , am      :: AngleMap -- map of angles to coords
+               , currAng :: Double   -- current angle of the laser
+               , equal   :: Bool     -- do we want to use lookupGE or lookupGT
+               , base    :: Coord    -- Base coordinate
+               } deriving (Show)
+```
+
+The ```currAng``` starts at 3&#960;/4 (Remember, I shifted the bounds of ```atan2``` by &#960;).
+
+The actual process of destroying an asteroid is done by the ```destroy``` function.
+
+I wrapped the Laser into an RWS Monad so the list of destroyed asteroids could be retrieved.
+
+```Haskell
+runDestroy :: LaserS ()
+runDestroy = do
+  laser <- get
+  coord <- destroy
+  tell [coord]
+  if M.null (am laser)
+    then return ()
+  else runDestroy
+
+destroy :: LaserS Coord
+destroy = do
+  laser <- get
+  -- if we've done a lookup where there are more than one elements
+  -- we don't want to search same list again
+  let amLookup = if equal laser then M.lookupGE else M.lookupGT
+  -- this catches the case where we need wrap around our angle i.e. 2pi -> 0
+  let lkup = amLookup (currAng laser) (am laser)
+  -- get the angle found and the Set of coords
+  let (ang, coords) = case lkup of
+                        Nothing -> fromJust $ M.lookupGE 0.0 (am laser)
+                        Just x  -> x
+  -- find and delete the closest coordinate
+  let p@(_, toDest) = foldl1 (\acc test -> if (fst acc) > (fst test) then test else acc) coords
+  let coords' = S.delete p coords
+  -- if we've deleted the last coordinate then just delete the key/val pair otherwise update set
+  -- the boolean doesn't matter except in the else clause
+  let (equal', am') = if S.null coords' then (True, M.delete ang (am laser)) else (False, M.insert ang coords' (am laser))
+  put laser {numDest = (numDest laser) + 1, am = am', currAng = ang, equal = equal'}
+  return toDest
+```
+
+It's an ugly solution, seems quite imperative, but it was a complex problem to solve.
+Of note: Somehow this solution actually worked.
+When I was writing this up I realized that 3&#960;/4 is the angle for points above the base, when in reality we want below the base.
+However, when tested against the test cases I got the proper outputs and ordering of destruction correct.
+Maybe I'm overthinking this and I actually did do it properly, I'm not exactly sure.

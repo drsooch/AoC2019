@@ -8,6 +8,7 @@ module IntCode (
   , createIM
   -- Run Machine
   , getMachineOutput
+  , getMachineOutput'
   , runMachine
   , runChain
   , runFeedbackLoop
@@ -15,21 +16,21 @@ module IntCode (
 where
 
 import           Control.Monad.RWS.Strict
-import qualified Data.IntMap.Strict       as M
+import qualified Data.Map.Strict       as M
 import           Data.List                (foldl')
-import           Debug.Trace
 
-type Memory = M.IntMap Int
-type AMachines = M.IntMap AmplifierMachine
-type Address = Int
+type Memory = M.Map Integer Integer
+type AMachines = M.Map Integer AmplifierMachine
+type Address = Integer
 
 -- Aliasing the RWS for the IntCode Machine
-type Program = RWS [Int] [Int] IMachine
+type Program = RWS [Integer] [Integer] IMachine
 
 -- IntMachine representation
 data IMachine = IM { ip_    :: Address  -- Instruction Pointer Location
                    , mem_   :: Memory   -- Mapping memory addresses with their values
-                   , inpIx_ :: Int      -- Input index
+                   , inpIx_ :: Integer      -- Input index
+                   , relbIx_ :: Integer      -- Relative Index
                    } deriving (Show)
 
 -- State of Machine
@@ -44,14 +45,14 @@ data MachineState = Runnable
 -- AmplifierMachine wraps an IM with additional information
 data AmplifierMachine = AM { iMachine_ :: IMachine
                            , imState_  :: MachineState
-                           , output_   :: [Int]
-                           , inputs_   :: [Int]
+                           , output_   :: [Integer]
+                           , inputs_   :: [Integer]
                            } deriving (Show)
 
 -- feedback loop keeps track of the machines currently in execution
 data FeedbackLoop = FL { aMachines_  :: AMachines
-                       , ptr_        :: [Int]
-                       , curr_       :: Int
+                       , ptr_        :: [Integer]
+                       , curr_       :: Integer
                        } deriving (Show)
 
 -- IntCode Machine Operation types
@@ -63,14 +64,17 @@ data Op = Add
         | JumpFalse
         | LessThan
         | Equals
+        | IncRelB
         | Halt
         deriving (Show, Eq)
 
 -- Parameter type for instructions
 -- Pos = Position i.e. the value in a Source Address is an Address
 -- Imm = Immediate i.e. the value in a Source Address is a value
+-- Rel = Relative i.e. the value is in an address x values relative to source
 data Param = Pos Address
-           | Imm Int
+           | Imm Integer
+           | Rel Integer
            deriving (Show)
 
 -- Encodes an instruction into either a BinaryInst which is for Add/Mult
@@ -93,19 +97,28 @@ data Instruction = BinaryInst { opCode_ :: Op
 
 -- Useful for days 2, 5, and 7 part 1:
 -- runs a machine; given a memory layout and inputs
-getMachineOutput :: [Int] -> [Int] -> Int
+getMachineOutput :: [Integer] -> [Integer] -> Integer
 getMachineOutput mem inputs = last output
   where
     (_, _, output) = runRWS runMachine inputs (createIM mem)
 
+getMachineOutput' :: [Integer] -> [Integer] -> [Integer]
+getMachineOutput' mem inputs = output
+  where
+    (_, _, output) = runRWS runMachine inputs (createIM mem)
+
 -- create an IntCode Machine from a list of memory values
-createIM :: [Int] -> IMachine
-createIM xs = IM {ip_ = 0, mem_ = mem, inpIx_ = 0}
+createIM :: [Integer] -> IMachine
+createIM xs = IM { ip_ = 0
+                 , mem_ = mem
+                 , inpIx_ = 0
+                 , relbIx_ = 0
+                 }
   where
     mem = M.fromAscList $ zip [0..] xs
 
 -- Create an Amplifier Machine
-createAM :: [Int] -> Int -> AmplifierMachine
+createAM :: [Integer] -> Integer -> AmplifierMachine
 createAM mem phase = AM { iMachine_ = (createIM mem)
                         , imState_  = Runnable
                         , output_   = []
@@ -113,7 +126,7 @@ createAM mem phase = AM { iMachine_ = (createIM mem)
                         }
 
 -- create the starter feedback loop
-createFeedbackLoop :: [Int] -> [Int] -> FeedbackLoop
+createFeedbackLoop :: [Integer] -> [Integer] -> FeedbackLoop
 createFeedbackLoop mem phases = FL { aMachines_  = M.insert 0 machineA' aMachines
                                    , ptr_        = ptr
                                    , curr_       = 0
@@ -123,17 +136,17 @@ createFeedbackLoop mem phases = FL { aMachines_  = M.insert 0 machineA' aMachine
     -- the puzzle instructions require the first AM to have the phase setting plus a zero  in its input
     machineA = aMachines M.! 0
     machineA' = machineA {inputs_ = inputs_ machineA ++ [0]}
-    ptr = cycle [0 .. (length phases - 1)]
+    ptr = cycle [0 .. (length' phases - 1)] :: [Integer]
 
 -- exported wrapper for running a FeedbackLoop
-runFeedbackLoop :: [Int] -> [Int] -> Int
+runFeedbackLoop :: [Integer] -> [Integer] -> Integer
 runFeedbackLoop mem phases = runFeedbackLoop' $ createFeedbackLoop mem phases
 
 -- The guts of the work for FL is done here
 -- Acquire the first available machine, run it and collect its output
 -- feed its output into the next machine
 -- and continue
-runFeedbackLoop' :: FeedbackLoop -> Int
+runFeedbackLoop' :: FeedbackLoop -> Integer
 runFeedbackLoop' feedback
   -- the "max" machine is the highest index and is the one that has the answer included
   | isFinished feedback = last $ output_ $ snd $ M.findMax (aMachines_ feedback)
@@ -170,17 +183,17 @@ runMachineMS' = do
   im <- get
   if op == Halt
     then return Finished
-  else if op == LoadVal && (length inputs < (inpIx_ im + 1))
+  else if op == LoadVal && (length' inputs < (inpIx_ im + 1))
     then return NeedsInput
   else runMachineMS'
 
 -- fold over a list of phase settings feeding the output from the previous
 -- machine into the next
-runChain :: [Int] -> [Int] -> Int
+runChain :: [Integer] -> [Integer] -> Integer
 runChain mem phases = foldl' (runChain' mem) 0 phases
 
 -- helper for runChain, actually executes the machine
-runChain' :: [Int] -> Int -> Int -> Int
+runChain' :: [Integer] -> Integer -> Integer -> Integer
 runChain' mem prevOutput phase = getMachineOutput mem [phase, prevOutput]
 
 -- runs a machine until a halt code is encountered
@@ -200,19 +213,21 @@ runStep = do
   case inst of
     UnaryInst LoadVal _       -> execLoad inst
     UnaryInst EmitVal _       -> execEmit inst
+    UnaryInst IncRelB _       -> execIncRel inst
     JumpInst _ _ _            -> execJump inst
     BinaryInst Equals _ _ _   -> execTest inst
     BinaryInst LessThan _ _ _ -> execTest inst
     BinaryInst _ _ _ _        -> execCompute inst
     HaltInst                  -> return Halt
+    _                         -> error "Failed runStep"
 
 -- Load a Value from the Reader Input
 execLoad :: Instruction -> Program Op
 execLoad inst = do
   inpVals <- ask
   im <- get
-  let input = inpVals !! inpIx_ im  -- get the input value at the input index
-  let mem' = insertP (mem_ im) (dest_ inst) input
+  let input = inpVals !! (fromIntegral $ inpIx_ im)  -- get the input value at the input index
+  let mem' = insertP im (dest_ inst) input
   let ip' = incIP inst (ip_ im)
   put im {ip_ = ip', mem_ = mem', inpIx_ = (inpIx_ im) + 1} -- construct updated state
   return $ numToOp $ opCodeNum (mem' M.! ip')
@@ -221,7 +236,7 @@ execLoad inst = do
 execEmit :: Instruction -> Program Op
 execEmit inst = do
   im <- get
-  tell [lookupP (mem_ im) (dest_ inst)]
+  tell [lookupP im (dest_ inst)]
   let ip' = incIP inst (ip_ im)
   put im {ip_ = ip'}
   return $ (numToOp . opCodeNum) ((mem_ im) M.! ip')
@@ -230,13 +245,14 @@ execEmit inst = do
 execTest :: Instruction -> Program Op
 execTest inst = do
   im <- get
-  let (val1, val2) = (lookupP (mem_ im) (src1_ inst), lookupP (mem_ im) (src2_ inst))
+  let (val1, val2) = (lookupP im (src1_ inst), lookupP im (src2_ inst))
   let result = case opCode_ inst of
                  LessThan -> val1 < val2
                  Equals   -> val1 == val2
+                 _        -> undefined
   let mem' = if result
-             then insertP (mem_ im) (dest_ inst) 1
-             else insertP (mem_ im) (dest_ inst) 0
+             then insertP im (dest_ inst) 1
+             else insertP im (dest_ inst) 0
   let ip' = incIP inst (ip_ im)
   put im {ip_ = ip', mem_ = mem' }
   return $ (numToOp . opCodeNum) (mem' M.! ip')
@@ -245,11 +261,12 @@ execTest inst = do
 execJump :: Instruction -> Program Op
 execJump inst = do
   im <- get
-  let testVal = lookupP (mem_ im) (test_ inst)
+  let testVal = lookupP im (test_ inst)
   -- test based on Jump condition if evals to true we change ip to the 2nd parameter, else normal incIP
   let ip' = case (opCode_ inst) of
-              JumpFalse -> if testVal == 0 then lookupP (mem_ im) (jumpTo_ inst) else incIP inst (ip_ im)
-              JumpTrue  -> if testVal /= 0 then lookupP (mem_ im) (jumpTo_ inst) else incIP inst (ip_ im)
+              JumpFalse -> if testVal == 0 then lookupP im (jumpTo_ inst) else incIP inst (ip_ im)
+              JumpTrue  -> if testVal /= 0 then lookupP im (jumpTo_ inst) else incIP inst (ip_ im)
+              _         -> undefined
   put im {ip_ = ip'}
   return $ (numToOp . opCodeNum) ((mem_ im) M.! ip')
 
@@ -257,15 +274,24 @@ execJump inst = do
 execCompute :: Instruction -> Program Op
 execCompute inst = do
   im <- get
-  let (val1, val2) = (lookupP (mem_ im) (src1_ inst), lookupP (mem_ im) (src2_ inst))
+  let (val1, val2) = (lookupP im (src1_ inst), lookupP im (src2_ inst))
   let result = case opCode_ inst of
         Add  -> val1 + val2
         Mult -> val1 * val2
         x    -> error $ "Failed OpCode in execCompute" ++ (show x)
-  let mem' = insertP (mem_ im) (dest_ inst) result
+  let mem' = insertP im (dest_ inst) result
   let ip' = incIP inst (ip_ im)
   put im {ip_ = ip', mem_ = mem'}
   return $ (numToOp . opCodeNum) (mem' M.! ip')
+
+execIncRel :: Instruction -> Program Op
+execIncRel inst = do
+  im <- get
+  let relbIx' = (relbIx_ im) + lookupP im (dest_ inst)
+  let ip' = incIP inst (ip_ im)
+  put im {ip_ = ip', relbIx_ = relbIx'}
+  return $ (numToOp . opCodeNum) (mem_ im M.! ip')
+
 
 -- create an instruction
 createInst :: IMachine -> Instruction
@@ -278,6 +304,7 @@ createInst im = case op of
                   6  -> jInst JumpFalse
                   7  -> bInst LessThan
                   8  -> bInst Equals
+                  9  -> uInst IncRelB
                   99 -> HaltInst
                   _  -> error $ "invalid instruction code " ++ show im
   where
@@ -289,7 +316,7 @@ createInst im = case op of
     jInst i = JumpInst   i (toParam ip1 p1) (toParam ip2 p2)
     uInst i = UnaryInst  i (toParam ip1 p1)
 
-numToOp :: Int -> Op
+numToOp :: Integer -> Op
 numToOp n = case n of
   1  -> Add
   2  -> Mult
@@ -299,37 +326,45 @@ numToOp n = case n of
   6  -> JumpFalse
   7  -> LessThan
   8  -> Equals
+  9  -> IncRelB
   99 -> Halt
+  _  -> error $ "failed numToOp"
 
 -- increment the inst pointer based on operation
-incIP :: Instruction -> Int -> Int
+incIP :: Instruction -> Integer -> Integer
 incIP (BinaryInst _ _ _ _) ip = ip + 4
 incIP (JumpInst _ _ _)     ip = ip + 3
-incIP (UnaryInst _ _) ip      = ip + 2
+incIP (UnaryInst _ _)      ip = ip + 2
 incIP _ ip                    = ip
 
 -- lookup value based on Param Type
-lookupP :: Memory -> Param -> Int
-lookupP mem (Pos addr) = mem M.! addr
-lookupP _ (Imm val)    = val
+lookupP :: IMachine -> Param -> Integer
+lookupP im (Pos addr) = (mem_ im) M.! addr
+lookupP _ (Imm val)   = val
+lookupP im (Rel x)    = (mem_ im) M.! (relbIx_ im + x)
 
 -- insert value into Memory (fails if not correct param type)
-insertP :: Memory -> Param -> Int -> Memory
-insertP mem' (Pos addr) val = M.insert addr val mem'
-insertP _ (Imm _) _         = error "Inserting into immediate address"
+insertP :: IMachine -> Param -> Integer -> Memory
+insertP im (Pos addr) val = M.insert addr val (mem_ im)
+insertP im (Rel x) val    = M.insert (relbIx_ im + x) val (mem_ im)
+insertP _ (Imm _) _       = error "Inserting into immediate address"
 
--- translates Int to Param
-toParam :: Int -> Int -> Param
+-- translates Integer to Param
+toParam :: Integer -> Integer -> Param
 toParam addr 0 = Pos addr
 toParam val  1 = Imm val
+toParam val  2 = Rel val
 toParam _ x    = error $ "Failed Parameter in toParam" ++ (show x)
 
 -- take an instruction number and get a specific digit
-paramMode :: Int -> Int -> Int
+paramMode :: Integer -> Integer -> Integer
 paramMode inst digit = mod (div inst (10^digit)) 10
 
-opCodeNum :: Int -> Int
+opCodeNum :: Integer -> Integer
 opCodeNum n = mod n 100
+
+-------------------------------------------------------------------------------------
+-- Day Seven
 
 -- get the next machine in the chain
 nextMachine :: FeedbackLoop -> (AmplifierMachine, FeedbackLoop)
@@ -349,3 +384,6 @@ nextRunnable fl = case (imState_ amNext) of
 -- check if all AMachines are finished
 isFinished :: FeedbackLoop -> Bool
 isFinished fl = M.null $ M.filter (\a -> (imState_ a) /= Finished) (aMachines_ fl)
+
+length' :: [a] -> Integer
+length' = fromIntegral . length
