@@ -14,9 +14,9 @@ answersD5 = do
 
 -- 10987514 -> answer
 part1 :: [Integer] -> Integer
-part1 mem = getMachineOutput mem [1]
+part1 mem = getMachineOutput mem [1] []
 
 -- 14195011 -> answer
 part2 :: [Integer] -> Integer
-part2 mem = getMachineOutput mem [5]
+part2 mem = getMachineOutput mem [5] []
 

@@ -864,3 +864,146 @@ Of note: Somehow this solution actually worked.
 When I was writing this up I realized that 3&#960;/4 is the angle for points above the base, when in reality we want below the base.
 However, when tested against the test cases I got the proper outputs and ordering of destruction correct.
 Maybe I'm overthinking this and I actually did do it properly, I'm not exactly sure.
+
+
+***
+### Day Eleven: Space Police
+
+***
+
+Not that anyone's keeping track of this, just enjoyed a nice quarantine Fourth of July in Northern Maine.
+While most of the mini-vacation was spent enjoying the nice weather, I was able to knock out day eleven.
+The challenge for this day was to paint a spaceships hull.
+We see the return of the IntCode Machine, this time however, there were no changes to be made.
+The machine will be running a Hull Painting Robot.
+
+The program to run the robot, will continually ask for input and provide output which will direct how the robot paints and moves.
+The input to the program will be either a 0 or a 1, with 0 being a black "pixel" and 1 being a white "pixel".
+To actually supply input, the robot will examine its current location on the hull and read the color.
+The output of the program will be either a 0 or a 1, and (from what I can tell) the output comes in pairs.
+The first output will be the color to paint the current hull "pixel", a 0 means black and a 1 meaning white.
+The second output will be the direction to turn and move the robot, a 0 is a left turn and a 1 is a right turn.
+Of note, the turn will always advance the robot one step in the direction of the turn.
+
+The representation of the robot is as follows:
+
+```Haskell
+type Coord = (Int, Int)
+type Hull = Map Coord Color
+
+data Color = Black -- 0
+           | White -- 1
+           deriving (Show, Eq, Enum)
+
+data Dir = North
+         | South
+         | East
+         | West
+         deriving (Show, Eq)
+
+data Robot = Robot { hull    :: Hull
+                   , painted :: Set Coord
+                   , currLoc :: Coord
+                   , im      :: IMachine
+                   , dir     :: Dir
+                   , onPaint :: Bool
+                   } deriving (Show)
+```
+
+A ```Hull``` is a map of ```Coord``` to ```Color```.
+This is where we keep track of the current state of the hull.
+We use a default lookup on this map that defaults to Black if we inspect a coordinate that hasn't been painted.
+We keep track of what we've painted using a set of ```Coord```, this is only used for Part One.
+The Direction encodes the way the robot is currently facing and is used to control how the robot turns.
+We also have a boolean flag, ```onPaint```.
+This flag is used when we are using the output values from the machine.
+I never actually examined how the output was generated, i.e. The way the function to operate on the outputs is agnostic to how many values were actually output.
+So hypothetically if only one output was given, the program will reliably track which operation to run.
+
+The main operation for day eleven is ```runRobot```.
+It uses ```runMachine``` internally to run the embedded ```IMachine``` in the robot.
+I've altered the way ```runMachine``` works to accept operations that we want to pause on.
+
+```Haskell
+runRobot :: Robot -> Robot
+runRobot r = do
+  let currCol = fromColor $ coordToColor r
+  let (op, im', out) = runRWS (runMachine [LoadVal, Halt]) [currCol] (im r)
+  if op == Halt
+    then r
+    else runRobot $ movePaint out $ updateIM im' r
+
+movePaint :: [Integer] -> Robot -> Robot
+movePaint (x:xs) r = case (onPaint r) of
+                       True  -> movePaint xs $ paint x r
+                       False -> movePaint xs $ turn x r
+movePaint [] r      = r
+
+paint :: Integer -> Robot -> Robot
+paint col r = notPaint $ r {hull = hull', painted = painted'}
+  where
+    hull' = M.insert (currLoc r) (toColor col) (hull r)
+    painted' = S.insert (currLoc r) (painted r)
+
+turn :: Integer -> Robot -> Robot
+turn 0 r = notPaint $ case dir r of
+             North -> r { currLoc = addCoords (currLoc r) (-1, 0), dir = West}
+             South -> r { currLoc = addCoords (currLoc r) (1, 0), dir = East}
+             East  -> r { currLoc = addCoords (currLoc r) (0, 1), dir = North}
+             West  -> r { currLoc = addCoords (currLoc r) (0, -1), dir = South}
+turn 1 r = notPaint $ case dir r of
+             North -> r { currLoc = addCoords (currLoc r) (1, 0), dir = East}
+             South -> r { currLoc = addCoords (currLoc r) (-1, 0), dir = West}
+             East  -> r { currLoc = addCoords (currLoc r) (0, -1), dir = South}
+             West  -> r { currLoc = addCoords (currLoc r) (0, 1), dir = North}
+```
+
+A couple of notes about the functions defined above:
+
+- ```paint``` and ```turn``` are wrapped in ```notPaint``` inverts the flag on each pass.
+- In Day Nine, the memory was supposed to be arbitrarily large. Any attempts to read from memory not already created we should default to 0. In my write-up of that day, I mentioned that I never ran into any issues with this. However, for this day I started to get exceptions. This was a simple fix as all that needed to change was to provide a default value, 0, for any lookups done on the memory.
+
+##### Part One:
+
+Part One was simple, all that needs to be done is to find out how many "pixels" were painted ONCE.
+This means we are only counting unique "pixels" that were painted, this is encoded in the set ```painted```.
+
+```Haskell
+part1 :: [Integer] -> Int
+part1 = S.size . painted . runRobot . mkRobot
+```
+
+##### Part Two:
+
+Part Two was the actual running of the robot, the output is a registration number (part two's answer).
+The only difference from part one is that the starting "pixel" is changed from black to white.
+To get the actual output we need to display the pixels, I decided to use some unicode characters to make the output slightly more pretty, than day nine.
+A function was created to take the Map of the hull and transform it into rows.
+These rows are then altered from Colors to Strings.
+
+```Haskell
+part2 :: [Integer] -> [String]
+part2 = hullToChar . runRobot . mkRobotPart2
+
+hullToChar :: Robot -> [String]
+hullToChar = map (map toChar) . splitHull
+  where
+    toChar Black = ' '
+    toChar White = '█'
+
+-- determine the size of the hull and create a list of each row
+-- transforming each coord into a color
+splitHull :: Robot -> [[Color]]
+splitHull r = map (map (\c -> M.findWithDefault Black c (hull r)))
+  $ cells
+  where
+    minX = minimum $ map fst $ M.keys (hull r)
+    maxX = maximum $ map fst $ M.keys (hull r)
+    minY = minimum $ map snd $ M.keys (hull r)
+    maxY = maximum $ map snd $ M.keys (hull r)
+    cells = [makeRow minX maxX y | y <- reverse [minY .. maxY]]
+
+-- helper to make a row of coords
+makeRow :: Int -> Int -> Int -> [Coord]
+makeRow minX maxX y = [(x, y) | x <- [minX .. maxX]]
+``` 

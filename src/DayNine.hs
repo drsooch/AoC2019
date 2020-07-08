@@ -13,8 +13,12 @@ answersD9 = do
 
 -- 3100786347 -> answer
 part1 :: [Integer] -> [Integer]
-part1 mem = getMachineOutput' mem [1]
+part1 mem = output
+  where
+    (_, _, output) = getMachineRWS mem [1] []
 
 --  87023
 part2 :: [Integer] -> [Integer]
-part2 mem = getMachineOutput' mem [2]
+part2 mem = output
+  where
+    (_, _, output) = getMachineRWS mem [2] []

@@ -37,6 +37,7 @@ library
       DayEight
       DayNine
       DayTen
+      DayEleven
       IntCode
       IntCodeS
   other-modules:
@@ -46,7 +47,6 @@ library
   build-depends:
       base >=4.7 && <5
      , mtl
-     , transformers
      , containers
      , text
      , split

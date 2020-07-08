@@ -1,6 +1,6 @@
 module DaySeven (answersD7) where
 
-import           Data.List     (permutations)
+import           Data.List     (permutations, foldl')
 import qualified Data.Text     as T
 import qualified Data.Text.IO  as TIO
 import           IntCode
@@ -12,6 +12,13 @@ answersD7 = do
   print $ "Part One: " ++ (show $ part1 values)
   print $ "Part Two: " ++ (show $ part2 values)
 
+-- machine into the next
+runChain :: [Integer] -> [Integer] -> Integer
+runChain mem phases = foldl' (runChain' mem) 0 phases
+
+-- helper for runChain, actually executes the machine
+runChain' :: [Integer] -> Integer -> Integer -> Integer
+runChain' mem prevOutput phase = getMachineOutput mem [phase, prevOutput] []
 
 -- 13848 -> answer
 part1 :: [Integer] -> Integer
