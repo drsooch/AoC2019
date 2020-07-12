@@ -38,6 +38,7 @@ library
       DayNine
       DayTen
       DayEleven
+      DayTwelve
       IntCode
       IntCodeS
   other-modules:
@@ -50,6 +51,9 @@ library
      , containers
      , text
      , split
+     , linear
+     , vector
+     , megaparsec
      , Cabal
   default-language: Haskell2010
 

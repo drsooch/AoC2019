@@ -1007,3 +1007,143 @@ splitHull r = map (map (\c -> M.findWithDefault Black c (hull r)))
 makeRow :: Int -> Int -> Int -> [Coord]
 makeRow minX maxX y = [(x, y) | x <- [minX .. maxX]]
 ``` 
+
+***
+### Day Twelve: The N-Body Problem
+
+***
+
+The famous N-Body Problem (the one that I've never heard of until now), in astrophysics the N-Body Problem deals with the orbits of celestial objects.
+It is not simple enough to model an orbit just by mapping the objects velocity, as there are cases where an orbit is influenced by other objects in the system.
+This makes modeling an orbit much more complex as it must take into account the gravitational effect of other objects.
+Day Twelve dealt with a vastly simplified model, it centered around Jupiter's four largest moons.
+Each moon was given an X, Y, and Z position (the input was given in a funky format and I didn't bother creating a real parser for it so I just did some manual data-munging).
+Each moon also had an X, Y, and Z velocity vector.
+At the start of the model the velocity vector consisted of all 0's.
+
+For each step in the model, we must account for the gravitational effects of each moon on the others which will effect the velocity.
+
+The model works in the following way:
+- We apply the gravitational effects to each moon and update its velocity vector
+- After all gravity effects have been accounted for we update the position of each Moon by their individual velocity vector.
+
+For example:
+
+Take a Moon (Moon 1) with a position vector of (1, 0, 5) and another Moon (Moon 2) with a position vector of (4, -2, 5).
+The velocity vector for the Moon 1 is the result of comparing each element in Moon 1's position vector to Moon 2.
+If the element of a moon is greater than the one being compared to we subtract 1 to the corresponding velocity vectors element.
+If the element of a moon is less than the one being compared to we add 1 to the corresponding velocity vectors element.
+If the element of a moon is equal to the one being compared to we do nothing to the corresponding velocity vectors element.
+
+Ex: Moon 1 x coordinate = 1 and Moon 2 x coordinate = 4, therefore we subtract -1 from the x position of Moon 1's velocity vector to get (-1, 0, 0).
+Moon 1 y coordinate = 0 and Moon 2 y coordinate = -2, therefore we add 1 from the y position of Moon 1's velocity vector to get (-1, 1, 0).
+Moon 1 z coordinate = 5 and Moon 2 z coordinate = 5, therefore we do nothing and get Moon 1's final velocity vector of (-1, 1, 0).
+
+I decided to use a new package Linear, which is a mathematical vector package to model the Moons.
+I should have been using this much earlier as it makes manipulating vectors much easier.
+
+```Haskell
+type Moons = [Moon]
+type Vector = V3 Int
+data Moon = Moon { pos_ :: Vector
+                 , vel_ :: Vector
+                 } deriving (Show, Eq)
+
+applyGrav :: Moon -> Moon -> Moon
+applyGrav (Moon p1 v1) (Moon p2 _) = Moon p1 (v1 L.^+^ v1')
+  where
+    cmp EQ = 0
+    cmp GT = (-1)
+    cmp LT = 1
+    v1' = (fmap (cmp) $ L.liftI2 (compare) p1 p2)
+
+updateVel :: Moons -> Moons
+updateVel ms = map (\m -> foldl' applyGrav m ms) ms
+
+applyVel :: Moons -> Moons
+applyVel = map (updatePos)
+
+updatePos :: Moon -> Moon
+updatePos m = m {pos_ = (pos_ m) L.^+^ (vel_ m)}
+
+timestep :: Moons -> Moons
+timestep = applyVel . updateVel
+
+simulate :: Moons -> [Moons]
+simulate = iterate timestep
+```
+
+We can simulate the model by repeatedly applying the ```timestep``` function to the list of Moons.
+This is done through the aptly name ```simulate``` function which uses ```iterate``` which creates an infinite list of repeated applications of the function given.
+
+##### Part One:
+
+Part One required simulating 1000 steps of the system and calculating the total amount of energy in the system at this step.
+
+For one moon the total amount of energy is calculated by the sum of the absolute value of the position vector's elements multiplied by the sum of the absolute value of the velocity vector's elements.
+The total energy of the system is the sum of all moons energy.
+
+```Haskell
+part1 :: [[Int]] -> Int
+part1 = sum . map totalEnergy . head . drop 1000 . simulate . mkMoons
+
+kineticEnergy :: Moon -> Int
+kineticEnergy (Moon _ (V3 x y z)) = (abs x) + (abs y) + (abs z)
+
+potentialEnergy :: Moon -> Int
+potentialEnergy (Moon (V3 x y z) _) = (abs x) + (abs y) + (abs z)
+
+totalEnergy :: Moon -> Int
+totalEnergy m = (potentialEnergy m) * (kineticEnergy m)
+```
+
+##### Part Two:
+
+As mentioned in the preamble, the system of moons is a model of their orbits.
+These orbits continue indefinitely, and will eventually repeat.
+The prompt indicates in the test case that the system repeats when it matches its starting position.
+For Part Two we were supposed to find out how many steps it would take for the system to repeat.
+Therefore, I made a broad assumption that this meant we would have to match the starting position.
+However, brute-forcing the solution would be extremely slow, as the test case repeats after 4 trillion steps (I didn't actually count the digits in the prompt it was just a large number).
+This means there has to be a way to simplify the simulation and get the correct answer quickly.
+
+After looking up what the N-Body problem actually was, I came across a formula that dealt with the total energy of the system.
+Now this problem is nowhere near as complex or similar to the real N-Body problem, but I thought that that was where I should look.
+After about an hour of examining the energy of the system at different steps, I realized I had no idea what I was doing.
+I thought maybe there would be a pattern that could be leveraged in how the energy changed from step to step.
+I was wrong.
+After this failed attempt I went to my faithful Neil Smith and looked at how he approached the problem.
+His first sentence said that each coordinate of the planet is independent of the other and that it's possible to count how long it takes for a planet to cycle to the same position.
+I was extremely deflated that I didn't start there and a tad embarrassed.
+
+With this in mind its simple to find out how many steps it takes.
+First you must find the period of the cycle for each coordinate X, Y, and Z.
+This means we have to count how many steps it takes for all four planets to have their coordinates match up to the starting position.
+This had to be done independently or else it would just be brute-forcing.
+Once you get the counts for each coordinate you can just find the smallest multiple of the three numbers and that's how many steps it would take to repeat.
+
+In the end I still couldn't get the function to behave properly, when I compared my implementation to Neil's it appears my step counts were off by 2.
+So I cheated and mapped (+2) to final counts.
+I'm not proud of it, and it really shows a lack of problem solving, but what can you do.
+
+```Haskell
+part2 :: [[Int]] -> Integer
+part2 m = foldl' lcm 1 $ map (+2) [moonsX, moonsY, moonsZ]
+  where
+    sim = simulate
+    moonsX = search X $ mkMoonsP2 X m
+    moonsY = search Y $ mkMoonsP2 Y m
+    moonsZ = search Z $ mkMoonsP2 Z m
+
+search :: Coord -> Moons -> Integer
+search c m = go (timestep m) 0
+  where
+    go m' n
+      | map (getCoord c . pos_) m == map (getCoord c . pos_) m' = n
+      | otherwise = go (timestep m') (n + 1)
+
+getCoord :: Coord -> Vector -> Int
+getCoord X (V3 x _ _) = x
+getCoord Y (V3 _ y _) = y
+getCoord Z (V3 _ _ z) = z
+```
