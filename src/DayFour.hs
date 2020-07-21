@@ -1,4 +1,4 @@
-module DayFour (answersD4) where
+module DayFour (answersD4, range, part1, part2) where
 {-
 
  Part One:
@@ -12,8 +12,8 @@ RANGE: 240298 - 784956
 
 answersD4 :: IO ()
 answersD4 = do
-  print $ "Part One: " ++ (show (part1 range))
-  print $ "Part Two: " ++ (show (part2 range))
+  print $ "Part One: " ++ show (part1 range)
+  print $ "Part Two: " ++ show (part2 range)
 
 minVal :: Int
 minVal = 240298

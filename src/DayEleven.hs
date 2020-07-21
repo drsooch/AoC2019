@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module DayEleven (answersD11) where
+module DayEleven (answersD11, parse, part1) where
 
 import           Control.Monad.RWS.Strict
 import           Data.List                (transpose)
@@ -36,8 +36,8 @@ data Robot = Robot { hull    :: Hull
 
 answersD11 :: IO ()
 answersD11 = do
-  contents <- map (read . T.unpack) . T.splitOn "," <$> TIO.readFile "input/dayEleven.txt" :: IO [Integer]
-  print $ "Part One: " ++ (show $ part1 contents)
+  contents <- parse
+  print $ "Part One: " ++ show (part1 contents)
   putStrLn "Part Two"
   mapM_ putStrLn $ part2 contents
 
@@ -70,8 +70,8 @@ mkRobotPart2 mem = (mkRobot mem) {hull = M.singleton (0, 0) White}
 runRobot :: Robot -> Robot
 runRobot r = do
   let currCol = fromColor $ coordToColor r
-  let (op, im', out) = runRWS (runMachine [LoadVal, Halt]) [currCol] (im r)
-  if op == Halt
+  let (ms, im', out) = getMachineRWS' (im r) [currCol] [LoadVal, Halt]
+  if ms == Finished
     then r
     else runRobot $ movePaint out $ updateIM im' r
 
@@ -145,8 +145,7 @@ hullToChar = map (map toChar) . splitHull
 -- determine the size of the hull and create a list of each row
 -- transforming each coord into a color
 splitHull :: Robot -> [[Color]]
-splitHull r = map (map (\c -> M.findWithDefault Black c (hull r)))
-  $ cells
+splitHull r = map (map (\c -> M.findWithDefault Black c (hull r))) cells
   where
     minX = minimum $ map fst $ M.keys (hull r)
     maxX = maximum $ map fst $ M.keys (hull r)
@@ -157,3 +156,8 @@ splitHull r = map (map (\c -> M.findWithDefault Black c (hull r)))
 -- helper to make a row of coords
 makeRow :: Int -> Int -> Int -> [Coord]
 makeRow minX maxX y = [(x, y) | x <- [minX .. maxX]]
+
+parse :: IO [Integer]
+parse = do
+  contents <- TIO.readFile "input/dayEleven.txt"
+  return $ map (read . T.unpack) $ T.splitOn "," contents

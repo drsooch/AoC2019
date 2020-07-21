@@ -1,4 +1,4 @@
-module DayThree (answersD3) where
+module DayThree (answersD3, solve, parse, part1, part2) where
 
 import qualified Data.Map.Strict as M
 import qualified Data.Text       as T
@@ -18,11 +18,10 @@ origin = (0, 0)
 
 answersD3 :: IO ()
 answersD3 = do
-  contents <- TIO.readFile "input/dayThree.txt"
-  let [segments1, segments2] = map (map T.unpack . T.splitOn (T.pack ",")) $ T.lines contents
+  (segments1, segments2) <- parse
   let (p1, p2) =  solve segments1 segments2
-  print $ "Part 1: " ++ (show p1)
-  print $ "Part 2: " ++ (show p2)
+  print $ "Part 1: " ++ show p1
+  print $ "Part 2: " ++ show p2
 
 -- generates an X, Y coordinate and the total number of steps to that point
 -- silently failed ex: "b - len - 1" should be "b - (len - 1)"
@@ -79,3 +78,8 @@ solve s1 s2 = (part1 intersection, part2 intersection)
 manhattanDist :: Coord -> Int
 manhattanDist (x, y)  = abs x + abs y
 
+parse :: IO ([String], [String])
+parse = do
+  contents <- TIO.readFile "input/dayThree.txt"
+  let [segments1, segments2] = map (map T.unpack . T.splitOn (T.pack ",")) $ T.lines contents
+  return (segments1, segments2)

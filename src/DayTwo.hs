@@ -1,4 +1,4 @@
-module DayTwo (answersD2) where
+module DayTwo (answersD2, part1, part2, parse, nounVerbPairs) where
 
 import           Control.Monad.State
 import qualified Data.Text           as T
@@ -8,9 +8,7 @@ import           IntCodeS
 
 answersD2 :: IO ()
 answersD2 = do
-  contents <- TIO.readFile "input/dayTwo.txt"
-  let values = map (read . T.unpack) $ T.splitOn (T.pack ",") contents :: [Int]
-  let initIM = createIM values
+  initIM <- parse
   let partOne = part1 initIM
   let partTwo = part2 nounVerbPairs initIM
   print $ "Part One: " ++ show partOne
@@ -38,3 +36,8 @@ part2 ((x, y) : xs) im = if getMemValue 0 finalState == magicNumber then (x, y) 
   where
     replaceState = injectValues [(1, x), (2, y)] im
     finalState = execState runMachine replaceState
+
+parse :: IO IMachine
+parse = do
+  contents <- TIO.readFile "input/dayTwo.txt"
+  return $ createIM $ map (read . T.unpack) $ T.splitOn (T.pack ",") contents

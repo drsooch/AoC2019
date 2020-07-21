@@ -1,4 +1,4 @@
-module DayTen (answersD10) where
+module DayTen (answersD10, parse, part1, part2) where
 
 import           Control.Monad.RWS.Strict
 import           Data.List                (delete, elemIndices)
@@ -8,7 +8,8 @@ import           Data.Maybe               (fromJust)
 import           Data.Set                 (Set)
 import qualified Data.Set                 as S
 import           Data.Tuple               (swap)
-import qualified System.IO                as IO
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 
 type Coord = (Double, Double)
 type CoordMap = Map Coord (Set Double)
@@ -26,16 +27,11 @@ data Laser = L { numDest :: Int      -- Number of asteroids destroyed
 -- Parsing in Strings for this day as Text does not have elemIndices
 answersD10 :: IO ()
 answersD10 = do
-  handle <- IO.openFile "input/dayTen.txt" IO.ReadMode
-  contents <- IO.hGetContents handle
-  let asteroids = parseToCoordList $ lines contents
+  asteroids <- parse
   let (p1, ans) = part1 asteroids
   print $ "Part One " ++ (show p1) ++ ": " ++ (show ans)
-  let (_, _, destroyed) = part2 p1 asteroids
-  print $ "Part Two: " ++ (show $ destroyed !! 199)
-  print $ map (destroyed !!) [0, 1, 2, 3, 9, 19, 49, 99, 199, 200, 289]
-  IO.hClose handle
-  return ()
+  let destroyed = part2 p1 asteroids
+  print $ "Part Two: " ++ show (destroyed !! 199)
 
 
 -- create a list of coordinates
@@ -122,5 +118,12 @@ part1 cm =
 
 -- runs the laser
 -- (19, 19) -> 1919 -> answer
-part2 :: Coord -> [Coord] -> ((), Laser, [Coord])
-part2 p angM = runRWS runDestroy [] (createLaser p angM)
+part2 :: Coord -> [Coord] -> [Coord]
+part2 p angM = output
+  where
+    (_, _, output) = runRWS runDestroy [] (createLaser p angM)
+
+parse :: IO [Coord]
+parse = do
+  contents <- TIO.readFile "input/dayTen.txt"
+  return $ parseToCoordList $ lines $ T.unpack contents

@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-module DayTwelve (answersD12) where
+module DayTwelve (answersD12, parse, part1, part2) where
 
 import           Data.List    (foldl')
 import qualified Data.Text    as T
@@ -19,10 +19,9 @@ data Coord = X | Y | Z deriving (Show, Eq, Enum)
 
 answersD12 :: IO ()
 answersD12 = do
-  contents <-  TIO.readFile "input/dayTwelve.txt"
-  let moons = map (map (read . T.unpack) . T.splitOn (T.pack ",")) $ T.lines contents :: [[Int]]
-  print $ part1 moons
-  print $ part2 moons
+  moons <- parse
+  print $ "Part One: " ++ show (part1 moons)
+  print $ "Part Two: " ++ show (part2 moons)
 
 
 -- 6423 -> answer
@@ -114,3 +113,8 @@ getCoord :: Coord -> Vector -> Int
 getCoord X (V3 x _ _) = x
 getCoord Y (V3 _ y _) = y
 getCoord Z (V3 _ _ z) = z
+
+parse :: IO [[Int]]
+parse = do
+  contents <-  TIO.readFile "input/dayTwelve.txt"
+  return $ map (map (read . T.unpack) . T.splitOn (T.pack ",")) $ T.lines contents

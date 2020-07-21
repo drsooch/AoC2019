@@ -1147,3 +1147,93 @@ getCoord X (V3 x _ _) = x
 getCoord Y (V3 _ y _) = y
 getCoord Z (V3 _ _ z) = z
 ```
+
+***
+### Day Thirteen: Care Package
+
+***
+**Note** For those of you reading this real-timeish (which realistically is probably no one) , my Summer semester has started.
+With all the Covid business, I decided to take a heavy course load. Not sure how long in between updates it will be.
+
+Day Thirteen involved using the IntCode Machine to play the classic brick breaker arcade game.
+The game would be modeled as a simple ADT: ```Arcade```.
+The ```Arcade``` ADT wraps up the ```Screen``` type alias (which is just a map of x and y positions with a ```Tile``` type), the ```IMachine```, the ```MachineState```, the position of the ```Ball```, the position of the ```Paddle```, and the total score.
+
+The creation of the game screen is derived from the output provided by the ```IMachine```. 
+The first time the machine is run, the entire screen is output.
+Thereafter, every time something was output it was only the coordinates that were changed.
+I chose to play the game very simply (I'm honestly not sure there was any other way to play) and just have the paddle shadow the ball and constantly move to remain on the same x-coordinate as the ball.
+Speaking of which, the ```IMachine``` required the input from the "joystick" to move the paddle.
+To move left, a -1 is supplied. To move right, a 1 is supplied. To do nothing a 0 is supplied.
+Also as a note, I felt so excited to be (what I consider) functional and leverage the ```fromEnum``` function and apply it to ```Ordering```, which provides values from [0 .. 2].
+It wasn't needlessly complex but an if statement or pattern matching would've done the exact same thing.
+
+Also of note, I did some fiddling with the IntCode module, I changed some of the return types to ```MachineState``` instead of ```Op```.
+This just made it easier to reason about the running of the Machine. When the ```LoadVal``` operation is returned it doesn't always mean we need to stop running. 
+Only when the machine has exhausted it's input do we need to stop.
+
+```Haskell
+type Coord = (Integer, Integer)
+type Screen = Map Coord Tile
+
+data Tile = Empty
+          | Wall
+          | Block
+          | Paddle
+          | Ball
+          deriving (Show, Eq, Enum)
+
+data Arcade = Arcade { iMachine_     :: IMachine
+                     , machineState_ :: MachineState
+                     , ballPos_      :: Coord
+                     , paddlePos_    :: Coord
+                     , screen_       :: Screen
+                     , score_        :: Maybe Integer
+                     } deriving (Show)
+```
+
+##### Part One:
+
+Part One was a baby step into the Game.
+All it asked for was a count of the number of ```Block``` tiles on the screen at the start of the game.
+
+```Haskell
+part1 :: [Integer] -> Int
+part1 p =
+  M.size                      -- Get the size of the map of blocks
+  $ M.filter (== Block)       -- Filter out Tiles that aren't blocks
+  $ snd
+  $ mkScreen                  -- turn the output into a Screen
+  $ getMachineOutput p [] []  -- run the machine
+```
+
+##### Part Two:
+
+Part Two was actually playing the game.
+Here we needed to capture the final score when all the blocks have been destroyed.
+The function to run the ```Arcade``` was straightforward and matches a lot of the previous days.
+The pseudo-loop is ended when all the blocks are gone.
+There was nothing crazy about this day, despite how daunting it appeared at first.
+
+```Haskell
+runArcade :: Arcade -> Arcade
+runArcade a
+  | blocksLeft a || machineState_ a /= Finished = runArcade a'
+  | otherwise = a
+  where
+    input = movePaddle a
+    a' = updateArcade a $ getMachineRWS' (iMachine_ a) [input] [LoadVal, Halt]
+
+updateArcade :: Arcade -> (MachineState, IMachine, [Integer]) -> Arcade
+updateArcade arcade (ms, im, out) = arcade { iMachine_ = im'
+                                           , machineState_ = ms
+                                           , ballPos_ = findBall screen'
+                                           , paddlePos_ = findPaddle screen'
+                                           , screen_ = screen'
+                                           , score_ = score <|> score_ arcade
+                                           }
+  where
+    im' = resetInputIx im
+    (score, screen) = mkScreen out
+    screen' = M.union screen (screen_ arcade)
+```

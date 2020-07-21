@@ -1,4 +1,4 @@
-module DayOne (answersD1) where
+module DayOne (answersD1, parseD1, part1, part2) where
 
 fuel :: Int -> [Int]
 fuel n = result : takeWhile (>0) (fuel result)
@@ -16,7 +16,11 @@ part2 = sum . concatMap fuel
 
 answersD1 :: IO ()
 answersD1 = do
+  modules <- parseD1
+  print $ "Part One: " ++ show (part1 modules)
+  print $ "Part Two: " ++ show (part2 modules)
+
+parseD1 :: IO [Int]
+parseD1 = do
   contents <- readFile "input/dayOne.txt"
-  let modules = map (read :: String -> Int) $ lines contents
-  print $ part1 modules
-  print $ part2 modules
+  return $ map read $ lines contents

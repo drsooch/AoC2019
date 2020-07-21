@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module DaySix (answersD6) where
+module DaySix (answersD6, parse, part1, part2) where
 
 
 import           Data.Map        (Map)
@@ -15,9 +15,9 @@ type System = Map T.Text Orbits
 
 answersD6 :: IO ()
 answersD6 = do
-  contents <- (map splitOrbit . T.lines) <$> TIO.readFile "input/daySix.txt"
-  print $ "Part One: " ++ (show $ part1 contents)
-  print $ "Part Two: " ++ (show $ part2 contents)
+  contents <- parse
+  print $ "Part One: " ++ show (part1 contents)
+  print $ "Part Two: " ++ show (part2 contents)
 
 -- parse the input and swap value with key for use with M.fromList
 splitOrbit :: T.Text -> (T.Text, T.Text)
@@ -62,3 +62,8 @@ part2 o = S.size $ S.union (p1 S.\\ p2) (p2 S.\\ p1)
     orbits = M.fromList o
     p1 = traverseOrbit orbits $ sanNode orbits
     p2 = traverseOrbit orbits $ youNode orbits
+
+parse :: IO [(T.Text, T.Text)]
+parse = do
+  contents <- TIO.readFile "input/daySix.txt"
+  return $ map splitOrbit $ T.lines contents

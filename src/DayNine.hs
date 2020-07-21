@@ -1,4 +1,4 @@
-module DayNine (answersD9) where
+module DayNine (answersD9, parse, part1, part2) where
 
 import qualified Data.Text    as T
 import qualified Data.Text.IO as TIO
@@ -6,19 +6,19 @@ import           IntCode
 
 answersD9 :: IO ()
 answersD9 = do
-  contents <- TIO.readFile "input/dayNine.txt"
-  let values = map (read . T.unpack) $ T.splitOn (T.pack ",") contents :: [Integer]
-  print $ part1 values
-  print $ part2 values
+  values <- parse
+  print $ "Part One: " ++ show (part1 values)
+  print $ "Part Two: " ++ show (part2 values)
 
 -- 3100786347 -> answer
-part1 :: [Integer] -> [Integer]
-part1 mem = output
-  where
-    (_, _, output) = getMachineRWS mem [1] []
+part1 :: [Integer] -> Integer
+part1 mem = last $ getMachineOutput mem [1] []
 
 --  87023
-part2 :: [Integer] -> [Integer]
-part2 mem = output
-  where
-    (_, _, output) = getMachineRWS mem [2] []
+part2 :: [Integer] -> Integer
+part2 mem = last $ getMachineOutput mem [2] []
+
+parse :: IO [Integer]
+parse = do
+  contents <- TIO.readFile "input/dayNine.txt"
+  return $ map (read . T.unpack) $ T.splitOn (T.pack ",") contents

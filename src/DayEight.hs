@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module DayEight (answersD8) where
+module DayEight (answersD8, parse, part1) where
 
 import           Data.List
 import           Data.List.Split (chunksOf)
@@ -8,9 +8,8 @@ import qualified Data.Text.IO    as TIO
 
 answersD8 :: IO ()
 answersD8 = do
-  contents <- TIO.readFile "input/dayEight.txt"
-  let sifImg =  (map (read . T.unpack) . init . (T.chunksOf 1)) contents :: [Int]
-  print $ "Part One: " ++ (show $ part1 sifImg)
+  sifImg <- parse
+  print $ "Part One: " ++ show (part1 sifImg)
   mapM_ print (part2 sifImg)
 
 width, height :: Int
@@ -18,7 +17,7 @@ width = 25
 height = 6
 
 layers :: Int -> Int -> [Int] -> [[Int]]
-layers w h sif = chunksOf (w * h) sif
+layers w h = chunksOf (w * h)
 
 layers' :: [Int] -> [[Int]]
 layers' = layers width height
@@ -58,3 +57,8 @@ part2 =
   . layers'
   where
     transform x = if x == 1 then "X" else " "
+
+parse :: IO [Int]
+parse = do
+  contents <- TIO.readFile "input/dayEight.txt"
+  return $ (map (read . T.unpack) . init . T.chunksOf 1) contents
